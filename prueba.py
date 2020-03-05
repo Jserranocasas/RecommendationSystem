@@ -32,13 +32,19 @@ def ReaderCSV(csvPath):
         if(csvPath == kt.CSV_TAG):
             Tags = {}
             for row in reader:
-                id = row[0] + "-" + row[1]
-                
-                if id in Tags:
-                    Tags[id].addCount()
+                idMovie = row[0]
+                tag = row[1]
+                if tag in Tags:
+                    dic = Tags[tag]
+                    if idMovie in dic:
+                        dic[idMovie] = dic[idMovie] + 1
+                    else:
+                        dic[idMovie] = 1
+                    Tags[tag] = dic
                 else:
-                    Tags[id] = Tag(row[0], row[1])
-
+                    dic = {}
+                    dic[idMovie] = 1
+                    Tags[tag] = dic
 
             return Tags
 
@@ -68,10 +74,7 @@ def main():
     r = ReaderCSV(kt.CSV_RATING)
     t = ReaderCSV(kt.CSV_TAG)
 
-    print("Movie 11 --> " + m['11'].title)
-    print("User 1000 --> " + u['1000'].description)
-    print("Rating 1 --> " + r['1-809'].value)
-    print("Tag 0 --> " + t['114-afternoon section'].description)
+    print(t['Action'])
 
     print("¡Adios, mundo!")
 
