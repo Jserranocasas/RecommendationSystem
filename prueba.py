@@ -30,9 +30,15 @@ def ReaderCSV(csvPath):
 
         """ Parse the tags of csv """
         if(csvPath == kt.CSV_TAG):
-            Tags = []
+            Tags = {}
             for row in reader:
-                Tags.append( Tag(row[0], row[1]))
+                id = row[0] + "-" + row[1]
+                
+                if id in Tags:
+                    Tags[id].addCount()
+                else:
+                    Tags[id] = Tag(row[0], row[1])
+
 
             return Tags
 
@@ -65,7 +71,7 @@ def main():
     print("Movie 11 --> " + m['11'].title)
     print("User 1000 --> " + u['1000'].description)
     print("Rating 1 --> " + r['1-809'].value)
-    print("Tag 0 --> " + t[0].description)
+    print("Tag 0 --> " + t['114-afternoon section'].description)
 
     print("¡Adios, mundo!")
 
