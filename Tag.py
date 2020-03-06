@@ -9,5 +9,5 @@ class Tag:
         self.description = description
         self.count = 1
 
-    def addCount(self):
+    def incrementCount(self):
         self.count += 1
