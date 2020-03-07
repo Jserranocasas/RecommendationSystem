@@ -169,7 +169,7 @@ def calculateSimilarity(user, userProfile, itemProfiles, listMovies, dicRatings)
         iom = indexOfMovie(listMovies, movieId)
         itemProfile = itemProfiles[iom]
         cos = userProfile.dot(itemProfile) / (np.sqrt(userProfile.dot(userProfile)) * np.sqrt(itemProfile.dot(itemProfile)))
-        similarity.append((movieId, cos))
+        similarity.append((listMovies[indexOfMovie(listMovies, movieId)].title, cos))
 
     #Sort by cos value
     similarity.sort(key=lambda tup: tup[1], reverse=True)
@@ -182,7 +182,6 @@ def indexOfMovie(listMovies, movieId):
     @param listMovies movie list
     @param movieId movie id to searh
     """
-
     index = 0
 
     for movie in listMovies:
@@ -192,26 +191,23 @@ def indexOfMovie(listMovies, movieId):
     
     return -1
 
-def main():
-    print("¡Hola, mundo!")
-
-    user = 1
-
+def recommend(user, count):
     listMovies = ReaderCSVMovies()
     dicTags, listTags = ReaderCSVTag()
     dicRating = ReaderCSVRating()
 
+    if user not in dicRating:
+        raise ValueError("Not exist this user in database")
     
     itemProfiles = createItemProfiles(listMovies, dicTags, listTags)
     userProfile = createUserProfile(user, itemProfiles, listMovies, dicRating)
 
     similarityItems = calculateSimilarity(user, userProfile, itemProfiles, listMovies, dicRating)
 
-    for item in similarityItems:
-        print("Pelicula: " + listMovies[indexOfMovie(listMovies, item[0])].title + ". Afinidad: " + str(item[1]))
-
-    print("¡Adiós, mundo cruel!")
-
-
-if __name__ == "__main__":
-    main()
+    if len(similarityItems) < count:
+        return similarityItems
+    else:
+        v = []
+        for i in range(count):
+            v.append(similarityItems[i])
+        return v
