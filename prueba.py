@@ -33,33 +33,22 @@ def ReaderCSVTag():
     with open(kt.CSV_TAG, newline='', errors="ignore") as File:
         reader = csv.reader(File)
 
-        tags = {}
-        tagsItems = {}
+        dicTags = {}
         for row in reader:
-            idTag = row[0] + "-" + row[1]
-
-            if idTag in tags:
-                tags[idTag].incrementCount()
-            else:
-                tags[idTag] = Tag(row[0], row[1])
-
             idMovie, tag = row[0], row[1]
-            if tag in tagsItems:
-                dic = tagsItems[tag]
+            if tag in dicTags:
+                dic = dicTags[tag]
                 if idMovie in dic:
                     dic[idMovie] = dic[idMovie] + 1
                 else:
                     dic[idMovie] = 1
-                tagsItems[tag] = dic
+                dicTags[tag] = dic
             else:
                 dic = {}
                 dic[idMovie] = 1
-                tagsItems[tag] = dic
+                dicTags[tag] = dic
 
-        dataItemTags = list(tagsItems.items())
-        tagsItems = np.array(dataItemTags)
-
-        return tags, tagsItems
+        return dicTags, list(dicTags.keys())
 
 
 def ReaderCSVUser():
@@ -84,124 +73,142 @@ def ReaderCSVRating():
 
     with open(kt.CSV_RATING, newline='') as File:
         reader = csv.reader(File)
-        ratings = {}
+
+        dicRatings = {}
         for row in reader:
-            idTag = row[0] + "-" + row[1]
-            ratings[idTag] = Rating(row[0], row[1], float(row[2]))
+            idUser, idMovie, rating = int(row[0]), int(row[1]), float(row[2])
+            if idUser in dicRatings:
+                dic = dicRatings[idUser]
+                dic[idMovie] = rating
+                dicRatings[idUser] = dic
+            else:
+                dic = {}
+                dic[idMovie] = rating
+                dicRatings[idUser] = dic
+        
+        return dicRatings
 
-        return ratings
-
-
-def CreateItemProfiles(movies, tags, tagsItems):
+def createItemProfiles(listMovies, dicTags, listTags):
     """
     Create item profiles for technique TF-IDF
-    @param: movies Movies
-    @param: tags Tags
-    @param: tagsItems
+    @param: listMovies movie list
+    @param: dicTags tag dictionary with their occurance count
+    @param: listTags tag list
     """
 
-    high, width = len(movies), len(tagsItems)
-    moviesProfiles = [[0.0 for j in range(width)] for i in range(high)]
+    itemsProfiles = np.zeros((len(listMovies), len(listTags)))
+    
+    iot = 0 #tag index
+    for tag in listTags:
+        occurance = dicTags[tag]
 
-    i, j = 0, 0
-    summationItemProfile = 0.0
-    for movie in movies:
-        for tagItem in tagsItems:
-            existTag = movie.id + "-" + tagItem[0]
+        for tuple in occurance.items():
+            idMovie = tuple[0]
+            iom = indexOfMovie(listMovies, idMovie) #movie index in list
 
-            if existTag in tags:
-                invDocFrequency = math.log10(high / len(tagItem[1]))  # TODO
-                itemProfile = tags[existTag].count * invDocFrequency
-                moviesProfiles[i][j] = itemProfile
-                summationItemProfile += itemProfile * itemProfile
+            tf = tuple[1]
+            idf = math.log10(len(listMovies)/len(occurance))
 
-            j += 1
-        j = 0
-        i += 1
+            itemsProfiles[iom][iot] = tf * idf
+        
+        iot += 1
 
-    summationItemProfile = math.sqrt(summationItemProfile)
+    #Normalize array
+    itemsProfilesNormalized = np.zeros(itemsProfiles.shape)
+    i = 0
+    for v in itemsProfiles:
+        normalized = v / np.sqrt(np.sum(v**2))
+        itemsProfilesNormalized[i] = normalized
+        i+=1
+    
+    return itemsProfilesNormalized
 
-    for i in range(len(moviesProfiles)):
-        for j in range(len(moviesProfiles[i])):
-            moviesProfiles[i][j] /= summationItemProfile
-
-    return moviesProfiles
-
-
-def CreateUserProfiles(itemProfile, user, movies, tags, tagsItems, ratings):
+def createUserProfile(user, itemProfiles, listMovies, dicRatings):
     """
-    Create user profile for technique TF-IDF
-    @param: itemProfile Matrix
-    @param: users User    
-    @param: movies Movies
-    @param: tags Tags
-    @param: tagsItems
-    @param: ratings
+    Create a user profile for technique TF-IDF
+    @param user user to create the profile
+    @param itemProfiles item profile for technique TF-IDF
+    @param listMovies movie list
+    @param dicTags tag dictionary
+    @param listTags tag list
+    @param dicRatings rating dictionary
     """
-    high, width = len(movies), len(tagsItems)
+    userProfile = np.zeros((len(itemProfiles[0])))
+    ratingByUser = dicRatings[user]
+    averageRating = np.array(list(ratingByUser.values())).mean()
 
-    userMatrix = [[0.0 for j in range(width)] for i in range(high)]
+    for tuple in ratingByUser.items():
+        iom = indexOfMovie(listMovies, tuple[0]) #movie index in list
+        rating = tuple[1]
 
-    i, j = 0, 0
-    numberRatings = 0
-    averageRating = 0.0
-
-    for movie in movies:
-        existRating = user + "-" + movie.id
-        rating = ratings.get(existRating, Rating(0, 0, 0.0)).value
-
-        for j in range(width):
-
-            if rating != 0.0:
-                numberRatings += 1
-                averageRating += rating
-                userMatrix[i][j] = rating  # Keep r now for greater efficiency
-
-        i += 1
-
-    averageRating /= numberRatings
-
-    userProfile = [0.0 for j in range(width)]
-    for i in range(len(userMatrix)):
-        for j in range(len(userMatrix[i])):
-            userMatrix[i][j] -= averageRating
-            userMatrix[i][j] *= itemProfile[i][j]
-            userProfile[j] += userMatrix[i][j]
+        w = rating - averageRating
+        userProfile += (itemProfiles[iom] * w)
 
     return userProfile
 
-
-def CalculateSimilarity(userProfile, itemProfile):
+def calculateSimilarity(user, userProfile, itemProfiles, listMovies, dicRatings):
     """
-    Calculate similarity through the cosine function of the two vectors
-    @param: userProfile Vector
-    @param: itemProfile Vector  
+    Calculate the similiraty with the items that user has not rated
+    @param user user id
+    @param userProfile user profile
+    @param itemProfiles item profiles
+    @param listMovies movie list
+    @param dicRating rating dictionary
+    """
+    ratingsByUser = dicRatings[user]
+
+    #Items that user has not seen
+    movieIds = []
+    for movie in listMovies:
+        if int(movie.id) not in ratingsByUser:
+            movieIds.append(movie.id)
+
+    similarity = []
+    #Similarity with items
+    for movieId in movieIds:
+        iom = indexOfMovie(listMovies, movieId)
+        itemProfile = itemProfiles[iom]
+        cos = userProfile.dot(itemProfile) / (np.sqrt(userProfile.dot(userProfile)) * np.sqrt(itemProfile.dot(itemProfile)))
+        similarity.append((movieId, cos))
+
+    #Sort by cos value
+    similarity.sort(key=lambda tup: tup[1], reverse=True)
+
+    return similarity
+
+def indexOfMovie(listMovies, movieId):
+    """
+    Return the index of movie in the list, or -1 if not exits
+    @param listMovies movie list
+    @param movieId movie id to searh
     """
 
-    summationUser = 0.0
-    summationItem = 0.0
-    summationUI = 0.0
+    index = 0
+
+    for movie in listMovies:
+        if int(movie.id) == int(movieId):
+            return index
+        index += 1
     
-
-    for i in range(len(userProfile)):
-        summationUser += userProfile[i] * userProfile[i]
-        summationItem += itemProfile[i] * itemProfile[i]
-        summationUI += userProfile[i] * itemProfile[i]
-
-    return summationUI / (math.sqrt(summationUser) * math.sqrt(summationItem))
+    return -1
 
 def main():
     print("¡Hola, mundo!")
 
-    user = "1"
-    tags, tagsItems = ReaderCSVTag()
-    movies, ratings = ReaderCSVMovies(), ReaderCSVRating()
+    user = 1
 
-    itemProfile = CreateItemProfiles(movies, tags, tagsItems)
-    userProfile = CreateUserProfiles(
-        itemProfile, user, movies, tags, tagsItems, ratings)
+    listMovies = ReaderCSVMovies()
+    dicTags, listTags = ReaderCSVTag()
+    dicRating = ReaderCSVRating()
 
-    print(CalculateSimilarity(userProfile, itemProfile[0]))
+    
+    itemProfiles = createItemProfiles(listMovies, dicTags, listTags)
+    userProfile = createUserProfile(user, itemProfiles, listMovies, dicRating)
+
+    similarityItems = calculateSimilarity(user, userProfile, itemProfiles, listMovies, dicRating)
+
+    for item in similarityItems:
+        print("Pelicula: " + listMovies[indexOfMovie(listMovies, item[0])].title + ". Afinidad: " + str(item[1]))
 
     print("¡Adiós, mundo cruel!")
 
