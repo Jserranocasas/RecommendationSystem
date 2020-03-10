@@ -2,7 +2,6 @@ from Rating import Rating
 from Movie import Movie
 from User import User
 from Tag import Tag
-from time import time
 
 import Constants as kt
 import numpy as np
@@ -106,10 +105,11 @@ def createItemProfiles(listMovies, dicTags):
 
     itemsProfiles = np.zeros((len(listMovies), len(dicTags.keys())))
 
-    tagIndex = 0 
+    tagIndex = 0
     for moviesWithTag in dicTags.values():
         for idMovie, termFrequency in moviesWithTag.items():
-            movieIndex = indexOfMovie(listMovies, idMovie)  # movie index in list
+            movieIndex = indexOfMovie(
+                listMovies, idMovie)  # movie index in list
             idf = math.log10(len(listMovies)/len(moviesWithTag))
 
             itemsProfiles[movieIndex][tagIndex] = termFrequency * idf
@@ -144,7 +144,7 @@ def createUserProfile(user, itemProfiles, listMovies, dicRatings):
 
     for userRatings in ratingByUser.items():
         # Movie index in list
-        movieIndex = indexOfMovie(listMovies, userRatings[0])  
+        movieIndex = indexOfMovie(listMovies, userRatings[0])
         ratingValue = userRatings[1]
 
         w = ratingValue - averageRating
@@ -196,7 +196,6 @@ def indexOfMovie(listMovies, movieId):
     @param movieId movie id to searh
     @return: movie index of the movie passed by parameter 
     """
-
     index = 0
     for movie in listMovies:
         if movie.id == int(movieId):
@@ -206,30 +205,28 @@ def indexOfMovie(listMovies, movieId):
     return -1
 
 
-def main():
-    # Start counting.
-    start_time = time()
-
-    user = 500
-
+def recommend(user, count):
     listMovies = ReaderCSVMovies()
     dicTags = ReaderCSVTag()
     dicRating = ReaderCSVRating()
-    
+    dicUser = ReaderCSVUser()
+
+    if user not in dicUser:
+        raise ValueError("Not exist this user in database")
+
     itemProfiles = createItemProfiles(listMovies, dicTags)
     userProfile = createUserProfile(user, itemProfiles, listMovies, dicRating)
 
     similarityItems = calculateSimilarity(
         user, userProfile, itemProfiles, listMovies, dicRating)
 
-    for item in similarityItems:
-        print("Pelicula: " + item[0].title + ". Afinidad: " + str(item[1]))
+    # for item in similarityItems:
+    #print("Pelicula: " + item[0].title + ". Afinidad: " + str(item[1]))
 
-    # Calculate the elapsed time.
-    elapsed_time = time() - start_time
-
-    print("Elapsed time: %0.10f seconds." % elapsed_time)
-
-
-if __name__ == "__main__":
-    main()
+    if len(similarityItems) < count:
+        return similarityItems
+    else:
+        v = []
+        for i in range(count):
+            v.append(similarityItems[i])
+        return v
