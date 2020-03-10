@@ -90,7 +90,7 @@ class Ui_MainWindow(object):
 
             rowPosition = 0
             for m in movies:
-                self.tableWidget.setItem(rowPosition, 0, QtWidgets.QTableWidgetItem(m[0]))
+                self.tableWidget.setItem(rowPosition, 0, QtWidgets.QTableWidgetItem(m[0].title))
                 self.tableWidget.setItem(rowPosition, 1, QtWidgets.QTableWidgetItem("{0:.4f}".format(m[1])))
                 rowPosition += 1
         except ValueError:
@@ -116,4 +116,4 @@ if __name__ == "__main__":
     # Calculate the elapsed time.
     elapsed_time = time() - start_time
 
-    print("Elapsed time: %0.10f seconds." % elapsed_time)
+    print("Elapsed time: %0.2f seconds." % elapsed_time)
