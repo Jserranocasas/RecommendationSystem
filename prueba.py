@@ -2,6 +2,7 @@ from Rating import Rating
 from Movie import Movie
 from User import User
 from Tag import Tag
+from time import time
 
 import Constants as kt
 import numpy as np
@@ -17,9 +18,12 @@ def ReaderCSVMovies():
 
     with open(kt.CSV_MOVIES, newline='') as File:
         reader = csv.reader(File)
+
         movies = []
+        movieIndex = 0
         for row in reader:
-            movies.append(Movie(row[0], row[1]))
+            movies.append(Movie(movieIndex, int(row[0]), row[1]))
+            movieIndex += 1
 
         return movies
 
@@ -27,7 +31,7 @@ def ReaderCSVMovies():
 def ReaderCSVTag():
     """
     Read a csv file to save the content corresponding to the tags
-    @return: a dictionary with the tags and a array with the items what have the tags
+    @return: a dictionary with tags. These save the items that have
     """
 
     with open(kt.CSV_TAG, newline='', errors="ignore") as File:
@@ -35,20 +39,20 @@ def ReaderCSVTag():
 
         dicTags = {}
         for row in reader:
-            idMovie, tag = row[0], row[1]
-            if tag in dicTags:
-                dic = dicTags[tag]
-                if idMovie in dic:
-                    dic[idMovie] = dic[idMovie] + 1
-                else:
-                    dic[idMovie] = 1
-                dicTags[tag] = dic
-            else:
-                dic = {}
-                dic[idMovie] = 1
-                dicTags[tag] = dic
+            movieId, tagKey = row[0], row[1]
+            tag = dicTags.get(tagKey, {})
 
-        return dicTags, list(dicTags.keys())
+            if not tag:
+                tag[movieId] = 1
+                dicTags[tagKey] = tag
+            else:
+                movieWithTag = tag.get(movieId, {})
+                if not movieWithTag:
+                    tag[movieId] = 1
+                else:
+                    tag[movieId] += 1
+
+        return dicTags
 
 
 def ReaderCSVUser():
@@ -58,6 +62,7 @@ def ReaderCSVUser():
     """
     with open(kt.CSV_USER, newline='') as File:
         reader = csv.reader(File)
+
         users = {}
         for row in reader:
             users[row[0]] = User(row[0], row[1])
@@ -76,141 +81,154 @@ def ReaderCSVRating():
 
         dicRatings = {}
         for row in reader:
-            idUser, idMovie, rating = int(row[0]), int(row[1]), float(row[2])
-            if idUser in dicRatings:
-                dic = dicRatings[idUser]
-                dic[idMovie] = rating
-                dicRatings[idUser] = dic
+            userId, movieId, value = int(row[0]), int(row[1]), float(row[2])
+
+            rating = dicRatings.get(userId, {})
+
+            if not rating:
+                rating[movieId] = value
+                dicRatings[userId] = rating
             else:
-                dic = {}
-                dic[idMovie] = rating
-                dicRatings[idUser] = dic
-        
+                rating[movieId] = value
+                dicRatings[userId] = rating
+
         return dicRatings
 
-def createItemProfiles(listMovies, dicTags, listTags):
+
+def createItemProfiles(listMovies, dicTags):
     """
     Create item profiles for technique TF-IDF
     @param: listMovies movie list
     @param: dicTags tag dictionary with their occurance count
     @param: listTags tag list
+    @return: items Profiles Normalized
     """
 
-    itemsProfiles = np.zeros((len(listMovies), len(listTags)))
-    
-    iot = 0 #tag index
-    for tag in listTags:
-        occurance = dicTags[tag]
+    itemsProfiles = np.zeros((len(listMovies), len(dicTags.keys())))
 
-        for tuple in occurance.items():
-            idMovie = tuple[0]
-            iom = indexOfMovie(listMovies, idMovie) #movie index in list
+    tagIndex = 0 
+    for moviesWithTag in dicTags.values():
+        for idMovie, termFrequency in moviesWithTag.items():
+            movieIndex = indexOfMovie(listMovies, idMovie)  # movie index in list
+            idf = math.log10(len(listMovies)/len(moviesWithTag))
 
-            tf = tuple[1]
-            idf = math.log10(len(listMovies)/len(occurance))
+            itemsProfiles[movieIndex][tagIndex] = termFrequency * idf
 
-            itemsProfiles[iom][iot] = tf * idf
-        
-        iot += 1
+        tagIndex += 1
 
-    #Normalize array
+    # Normalize items profiles
     itemsProfilesNormalized = np.zeros(itemsProfiles.shape)
     i = 0
     for v in itemsProfiles:
-        normalized = v / np.sqrt(np.sum(v**2))
+        normalized = v / np.sqrt(np.sum(v*v))
         itemsProfilesNormalized[i] = normalized
-        i+=1
-    
+        i += 1
+
     return itemsProfilesNormalized
+
 
 def createUserProfile(user, itemProfiles, listMovies, dicRatings):
     """
     Create a user profile for technique TF-IDF
-    @param user user to create the profile
+    @param user int Id to identify the user
     @param itemProfiles item profile for technique TF-IDF
     @param listMovies movie list
     @param dicTags tag dictionary
     @param listTags tag list
     @param dicRatings rating dictionary
+    @return: user profile corresponding to user
     """
     userProfile = np.zeros((len(itemProfiles[0])))
     ratingByUser = dicRatings[user]
     averageRating = np.array(list(ratingByUser.values())).mean()
 
-    for tuple in ratingByUser.items():
-        iom = indexOfMovie(listMovies, tuple[0]) #movie index in list
-        rating = tuple[1]
+    for userRatings in ratingByUser.items():
+        # Movie index in list
+        movieIndex = indexOfMovie(listMovies, userRatings[0])  
+        ratingValue = userRatings[1]
 
-        w = rating - averageRating
-        userProfile += (itemProfiles[iom] * w)
+        w = ratingValue - averageRating
+        userProfile += (itemProfiles[movieIndex] * w)
 
     return userProfile
 
+
 def calculateSimilarity(user, userProfile, itemProfiles, listMovies, dicRatings):
     """
-    Calculate the similiraty with the items that user has not rated
-    @param user user id
-    @param userProfile user profile
-    @param itemProfiles item profiles
-    @param listMovies movie list
-    @param dicRating rating dictionary
+    Calculate the similiraty with the items that user has not rated through 
+    the cosine function of the userProfile, itemProfiles vectors
+    @param user int Id to identify the user
+    @param userProfile User profile corresponding to rated movies
+    @param itemProfiles Item profiles corresponding to assigned tags
+    @param listMovies List with all available movies
+    @param dicRatings Ratings dictionary with users ratings
+    @return: A vector ordered by cosine function value what contain the 
+    similarity between user profile and item profiles
     """
+
     ratingsByUser = dicRatings[user]
 
-    #Items that user has not seen
-    movieIds = []
+    # Items that user has not seen
+    unseenMovies = []
     for movie in listMovies:
-        if int(movie.id) not in ratingsByUser:
-            movieIds.append(movie.id)
+        if movie.id not in ratingsByUser:
+            unseenMovies.append(movie)
 
+    # Similarity with items
     similarity = []
-    #Similarity with items
-    for movieId in movieIds:
-        iom = indexOfMovie(listMovies, movieId)
-        itemProfile = itemProfiles[iom]
-        cos = userProfile.dot(itemProfile) / (np.sqrt(userProfile.dot(userProfile)) * np.sqrt(itemProfile.dot(itemProfile)))
-        similarity.append((movieId, cos))
+    for movie in unseenMovies:
+        itemProfile = itemProfiles[movie.index]
+        cos = userProfile.dot(
+            itemProfile) / (np.sqrt(userProfile.dot(userProfile)) * np.sqrt(itemProfile.dot(itemProfile)))
 
-    #Sort by cos value
+        similarity.append((movie, cos))
+
+    # Sort by cos value
     similarity.sort(key=lambda tup: tup[1], reverse=True)
 
     return similarity
+
 
 def indexOfMovie(listMovies, movieId):
     """
     Return the index of movie in the list, or -1 if not exits
     @param listMovies movie list
     @param movieId movie id to searh
+    @return: movie index of the movie passed by parameter 
     """
 
     index = 0
-
     for movie in listMovies:
-        if int(movie.id) == int(movieId):
+        if movie.id == int(movieId):
             return index
         index += 1
-    
+
     return -1
 
-def main():
-    print("¡Hola, mundo!")
 
-    user = 1
+def main():
+    # Start counting.
+    start_time = time()
+
+    user = 500
 
     listMovies = ReaderCSVMovies()
-    dicTags, listTags = ReaderCSVTag()
+    dicTags = ReaderCSVTag()
     dicRating = ReaderCSVRating()
-
     
-    itemProfiles = createItemProfiles(listMovies, dicTags, listTags)
+    itemProfiles = createItemProfiles(listMovies, dicTags)
     userProfile = createUserProfile(user, itemProfiles, listMovies, dicRating)
 
-    similarityItems = calculateSimilarity(user, userProfile, itemProfiles, listMovies, dicRating)
+    similarityItems = calculateSimilarity(
+        user, userProfile, itemProfiles, listMovies, dicRating)
 
     for item in similarityItems:
-        print("Pelicula: " + listMovies[indexOfMovie(listMovies, item[0])].title + ". Afinidad: " + str(item[1]))
+        print("Pelicula: " + item[0].title + ". Afinidad: " + str(item[1]))
 
-    print("¡Adiós, mundo cruel!")
+    # Calculate the elapsed time.
+    elapsed_time = time() - start_time
+
+    print("Elapsed time: %0.10f seconds." % elapsed_time)
 
 
 if __name__ == "__main__":
