@@ -12,6 +12,7 @@ from time import time
 
 import RecommendationSystem
 
+
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
@@ -25,12 +26,13 @@ class Ui_MainWindow(object):
         self.userLabel.setObjectName("userLabel")
 
         self.recomendationLabel = QtWidgets.QLabel(self.centralwidget)
-        self.recomendationLabel.setGeometry(QtCore.QRect(60, 60, 91, 21))
+        self.recomendationLabel.setGeometry(QtCore.QRect(60, 60, 110, 21))
         self.recomendationLabel.setObjectName("recomendationLabel")
 
         self.userEditText = QtWidgets.QLineEdit(self.centralwidget)
         self.userEditText.setGeometry(QtCore.QRect(180, 30, 181, 20))
-        self.userEditText.setValidator(QtGui.QRegExpValidator(QtCore.QRegExp('^[1-9]\d{3}$')))
+        self.userEditText.setValidator(
+            QtGui.QRegExpValidator(QtCore.QRegExp('^[1-9]\\d{3}$')))
         self.userEditText.setObjectName("userEditText")
         self.userEditText.setText("1")
 
@@ -58,7 +60,7 @@ class Ui_MainWindow(object):
         self.button = QtWidgets.QPushButton(self.centralwidget)
         self.button.setGeometry(QtCore.QRect(315, 100, 75, 23))
         self.button.setObjectName("button")
-        self.button.clicked.connect(lambda:self.getRecommendations())
+        self.button.clicked.connect(lambda: self.getRecommendations())
 
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(MainWindow)
@@ -74,13 +76,18 @@ class Ui_MainWindow(object):
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
-        MainWindow.setWindowTitle(_translate("MainWindow", "Basado en contenido"))
+        MainWindow.setWindowTitle(_translate(
+            "MainWindow", "Basado en contenido"))
         self.userLabel.setText(_translate("MainWindow", "Usuario ID"))
-        self.recomendationLabel.setText(_translate("MainWindow", "Recomendaciones"))
+        self.recomendationLabel.setText(
+            _translate("MainWindow", "Recomendaciones"))
         self.title.setText(_translate("MainWindow", "Peliculas recomendadas"))
         self.button.setText(_translate("MainWindow", "Buscar"))
 
     def getRecommendations(self):
+        # Start counting.
+        start_time = time()
+
         try:
             user = int(self.userEditText.text())
             count = self.recomendationEditText.value()
@@ -90,21 +97,26 @@ class Ui_MainWindow(object):
 
             rowPosition = 0
             for m in movies:
-                self.tableWidget.setItem(rowPosition, 0, QtWidgets.QTableWidgetItem(m[0]))
-                self.tableWidget.setItem(rowPosition, 1, QtWidgets.QTableWidgetItem("{0:.4f}".format(m[1])))
+                self.tableWidget.setItem(
+                    rowPosition, 0, QtWidgets.QTableWidgetItem(m[0].title))
+                self.tableWidget.setItem(
+                    rowPosition, 1, QtWidgets.QTableWidgetItem("{0:.4f}".format(m[1])))
                 rowPosition += 1
         except ValueError:
-            QtWidgets.QMessageBox.about(MainWindow, "Error", "Usuario no valido")
+            QtWidgets.QMessageBox.about(
+                MainWindow, "Error", "Usuario no valido")
+
+        # Calculate the elapsed time.
+        elapsed_time = time() - start_time
+        print("Elapsed time: %0.3f seconds." % elapsed_time)
 
     def clearTable(self):
         for pos in range(self.tableWidget.rowCount()):
             self.tableWidget.setItem(pos, 0, QtWidgets.QTableWidgetItem(""))
             self.tableWidget.setItem(pos, 1, QtWidgets.QTableWidgetItem(""))
 
+
 if __name__ == "__main__":
-    # Start counting.
-    start_time = time()
-    
     import sys
     app = QtWidgets.QApplication(sys.argv)
     MainWindow = QtWidgets.QMainWindow()
@@ -112,8 +124,3 @@ if __name__ == "__main__":
     ui.setupUi(MainWindow)
     MainWindow.show()
     sys.exit(app.exec_())
-
-    # Calculate the elapsed time.
-    elapsed_time = time() - start_time
-
-    print("Elapsed time: %0.10f seconds." % elapsed_time)

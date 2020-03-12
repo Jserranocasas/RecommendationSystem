@@ -64,7 +64,7 @@ def ReaderCSVUser():
 
         users = {}
         for row in reader:
-            users[row[0]] = User(row[0], row[1])
+            users[int(row[0])] = User(row[0], row[1])
 
         return users
 
@@ -219,9 +219,6 @@ def recommend(user, count):
 
     similarityItems = calculateSimilarity(
         user, userProfile, itemProfiles, listMovies, dicRating)
-
-    # for item in similarityItems:
-    #print("Pelicula: " + item[0].title + ". Afinidad: " + str(item[1]))
 
     if len(similarityItems) < count:
         return similarityItems
