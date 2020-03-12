@@ -101,6 +101,7 @@ class Ui_MainWindow(object):
                     rowPosition, 0, QtWidgets.QTableWidgetItem(m[0].title))
                 self.tableWidget.setItem(
                     rowPosition, 1, QtWidgets.QTableWidgetItem("{0:.4f}".format(m[1])))
+
                 rowPosition += 1
         except ValueError:
             QtWidgets.QMessageBox.about(
